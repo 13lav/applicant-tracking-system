@@ -54,7 +54,6 @@ class SearchApplicantsView(generics.ListAPIView):
         return queryset
 
 
-# TODO: remove id use code
 class ShortlistApplicantView(generics.UpdateAPIView):
     queryset = Applicant.objects.all()
     serializer_class = ApplicantSerializer

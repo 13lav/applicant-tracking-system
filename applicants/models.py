@@ -3,9 +3,6 @@ from django.db import models
 # Create your models here.
 
 class Applicant(models.Model):
-    # TODO: move to enums
-    # TODO: use numbers
-    # TODO: use code
     STATUS_CHOICES = [
         ('shortlisted', 'Shortlisted'),
         ('rejected', 'Rejected'),
