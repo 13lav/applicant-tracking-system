@@ -1,9 +1,10 @@
-from django.db.models import Q
+from django.db.models import Q, Count
 from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import Applicant
 from .serializers import ApplicantSerializer
+from itertools import chain
 
 # Create your views here.
 
@@ -86,21 +87,33 @@ class NameBasedSearchView(APIView):
 
         query_words = query.lower().split()
 
-        # Find exact match
+        # Find exact matches
         exact_matches = queryset.filter(name__iexact=query)
 
         # Find partial matches
-        partial_matches = queryset.none()
+
+        # Empty Q object for the filter
+        q_filter = Q()
+        # initialize the overlap_count annotation
+        overlap_count = 0
+
         for word in query_words:
-            word_matches = queryset.filter(name__icontains=word)
-            partial_matches = partial_matches.union(word_matches)
+            q_filter |= Q(name__icontains=word)  # Add filter for each word
+            overlap_count += Count('id', filter=Q(name__icontains=word))  # Add overlap word count function
+
+        # Partial matches with overlapping words count
+        partial_matches = queryset.filter(q_filter).annotate(
+            overlap_count=overlap_count
+        )
+
+        # Exclude exact_matches from partial_matches
+        partial_matches_filtered = partial_matches.exclude(id__in=exact_matches.values('id'))
 
         # Sort matches by the number of matching words
-        partial_matches = list(partial_matches)
-        partial_matches.sort(key=lambda applicant: sum(word in applicant.name.lower() for word in query_words), reverse=True)
+        partial_matches_ordered = partial_matches_filtered.order_by('-overlap_count')
 
-        # Combine exact matches with partial matches
-        combined_results = list(exact_matches) + [candidate for candidate in partial_matches if candidate not in exact_matches]
+        # Union of query sets while keeping the order intact
+        combined_results = chain(exact_matches, partial_matches_ordered)
 
         # Serialize and return the results
         serializer = ApplicantSerializer(combined_results, many=True)
